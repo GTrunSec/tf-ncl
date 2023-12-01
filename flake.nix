@@ -2,7 +2,7 @@
   inputs = {
     nixpkgs.url = "nixpkgs/nixos-unstable";
     utils.url = "github:numtide/flake-utils";
-    nickel.url = "github:tweag/nickel";
+    nickel.url = "github:tweag/nickel/1.3.0";
     topiary.url = "github:tweag/topiary";
     import-cargo.url = "github:edolstra/import-cargo";
     rust-overlay = {
@@ -34,7 +34,9 @@
 
           pkgs = import inputs.nixpkgs {
             localSystem = { inherit system; };
-            config = { };
+            config = {
+              allowUnfree = true;
+            };
             overlays = [
               (import inputs.rust-overlay)
             ];
@@ -184,6 +186,15 @@
           generateSchema = providerFn: pkgs.callPackage
             ./nix/nickel_schema.nix
             { jsonSchema = self.generateJsonSchema.${system} providerFn; inherit (self.packages.${system}) tf-ncl; };
+
+          initSchemaGenerator = nixpkgs: providerFn: let
+            generateJsonSchema' = pkgs.callPackage
+              (import ./nix/terraform_schema.nix (providerFn nixpkgs.terraform-providers.actualProviders))
+              { inherit (self.packages.${system}) schema-merge; };
+            in pkgs.callPackage
+              ./nix/nickel_schema.nix
+            { jsonSchema = generateJsonSchema'; inherit (self.packages.${system}) tf-ncl; };
+
 
           schemas = lib.mapAttrs
             (name: p: self.generateSchema.${system} (_: { ${name} = p; }))
